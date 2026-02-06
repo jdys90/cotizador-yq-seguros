@@ -49,7 +49,7 @@ def enviar_notificacion(cliente, correo, celular, plan_interes, n_familia):
     SMTP_SERVER = "smtppro.zoho.com"
     SMTP_PORT = 587
     SENDER_EMAIL = "administracion@yqcorredores.com"
-    SENDER_PASSWORD = "Yadira2025!" 
+    SENDER_PASSWORD = st.secrets["EMAIL_PASSWORD"]
     RECEIVER_EMAIL = "administracion@yqcorredores.com"
 
     asunto = f"NUEVO LEAD DE COTIZADOR: {cliente}"
@@ -539,4 +539,5 @@ else:
                     cls_clean = "_".join(cls_list)
                     fecha_str = datetime.now().strftime("%d%m%y_%H%M")
                     file_name = f"COTISALUD_{nom_clean}_{cls_clean}_{fecha_str}.pdf"
+
                     st.download_button("Descargar PDF", pdf_res, file_name, "application/pdf")

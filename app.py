@@ -8,10 +8,10 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# --- CONFIGURACIÓN DE PÁGINA Y ESTILOS ---
+# --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Cotizador YQ Seguros", page_icon="🛡️", layout="wide")
 
-# Estilos CSS personalizados
+# Estilos CSS
 st.markdown("""
     <style>
     .stButton>button {
@@ -44,35 +44,74 @@ CODIGO_ADMIN = "ADMIN2026"
 CODIGOS_ASESORES = ["ASE01", "ASE02", "ASE03", "VENTAS2026"] 
 
 # --- FUNCIONES ---
-def enviar_notificacion(cliente, correo, celular, plan_interes, n_familia):
-    """Envía un correo a administración usando Zoho Mail."""
+
+def guardar_historial(cliente, correo, celular, edad, salud, cobertura, continuidad, clinicas, n_familia, usuario_rol):
+    """Guarda cada cotización en un archivo CSV local."""
+    archivo_historial = 'historial_leads.csv'
+    
+    nuevo_registro = {
+        'Fecha': datetime.now().strftime('%d/%m/%Y %H:%M:%S'),
+        'Cliente': cliente,
+        'Correo': correo,
+        'Celular': celular,
+        'Edad_Titular': edad,
+        'Salud': salud,
+        'Cobertura_Interes': cobertura,
+        'Condicion': continuidad,
+        'Clinicas_Preferidas': ", ".join(clinicas),
+        'Total_Asegurados': n_familia + 1,
+        'Rol_Cotizador': usuario_rol
+    }
+    
+    df_new = pd.DataFrame([nuevo_registro])
+    
+    if not os.path.exists(archivo_historial):
+        df_new.to_csv(archivo_historial, index=False, encoding='utf-8-sig')
+    else:
+        df_new.to_csv(archivo_historial, mode='a', header=False, index=False, encoding='utf-8-sig')
+
+def enviar_notificacion(cliente, correo, celular, plan_interes, n_familia, edad, clinicas, continuidad):
+    """Envía un correo detallado a administración con los datos de cotización."""
+    # --- CONFIGURACIÓN ZOHO ---
     SMTP_SERVER = "smtppro.zoho.com"
     SMTP_PORT = 587
     SENDER_EMAIL = "administracion@yqcorredores.com"
-    SENDER_PASSWORD = st.secrets["EMAIL_PASSWORD"]
+    SENDER_PASSWORD = st.secrets["EMAIL_PASSWORD"] 
     RECEIVER_EMAIL = "administracion@yqcorredores.com"
+    # -----------------------------------------------------
 
-    asunto = f"NUEVO LEAD DE COTIZADOR: {cliente}"
+    # Formatear lista de clínicas
+    clinicas_txt = ", ".join(clinicas) if clinicas else "Sin preferencia específica"
+
+    asunto = f"NUEVO LEAD (COTIZADOR): {cliente}"
     cuerpo = f"""
     Hola Administración,
     
-    Un cliente ha generado una cotización en el sistema:
-    
+    Se ha generado una nueva cotización en el sistema.
+    ¡Llama ahora mismo!
+
+    DATOS DEL CLIENTE:
     ------------------------------------------------
     Nombre: {cliente}
     Correo: {correo}
     WhatsApp: {celular}
-    Interés (Cobertura): {plan_interes}
-    Asegurados Totales: {n_familia}
-    Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}
     ------------------------------------------------
     
-    Este correo fue generado automáticamente por el Cotizador YQ.
+    DATOS DE LA COTIZACIÓN:
+    ------------------------------------------------
+    Edad Titular: {edad} años
+    Interés (Cobertura): {plan_interes}
+    Condición: {continuidad}
+    Clínicas Preferidas: {clinicas_txt}
+    Total Asegurados (Familia): {n_familia + 1}
+    ------------------------------------------------
+    
+    Fecha y hora de cotización: {datetime.now().strftime('%d/%m/%Y %H:%M')}
     """
 
     try:
         if SENDER_PASSWORD == "TU_CONTRASEÑA_AQUI":
-            print("⚠️ [AVISO] No se envió el correo porque falta la contraseña en app.py")
+            print("⚠️ [AVISO] Correo no enviado (Falta contraseña).")
             return True
 
         msg = MIMEMultipart()
@@ -404,7 +443,7 @@ else:
     if 'resultados' not in st.session_state: st.session_state['resultados'] = None
     
     with st.sidebar:
-        # --- LOGO (REQ 2) ---
+        # --- LOGO ---
         if os.path.exists("logo.png"):
             st.sidebar.image("logo.png", use_container_width=True)
         
@@ -431,11 +470,10 @@ else:
         cob = st.selectbox("Cobertura", ["Básica", "Integral", "Integral + Reembolso", "Integral + Cobertura Internacional"])
         clinicas = st.multiselect("Clínicas de preferencia", clinicas_unicas, placeholder="Puedes elegir más de una")
         
-        # --- SECCIÓN DESCUENTO (REQ 1) ---
+        # --- DESCUENTO (REQ 1) ---
         st.header("Descuento")
         codigo_acceso = st.text_input("Código opcional de descuento", type="password")
         
-        # LOGICA DE ROLES
         es_admin = (codigo_acceso == CODIGO_ADMIN)
         es_asesor = (codigo_acceso in CODIGOS_ASESORES)
         es_cliente = (not es_admin and not es_asesor)
@@ -445,7 +483,7 @@ else:
         if es_cliente:
             st.info("Para generar tu cotización, por favor ingresa tus datos de contacto:")
             correo = st.text_input("Correo Electrónico")
-            # --- CELULAR ESTRICTO ---
+            # --- CELULAR ESTRICTO (REQ 2) ---
             celular_num = st.number_input("Celular / WhatsApp (Solo números)", min_value=0, step=1, format="%d", value=0)
             celular = str(celular_num) if celular_num > 0 else ""
         
@@ -459,7 +497,6 @@ else:
                     for p in df_full[df_full['Aseguradora']==c]['Plan'].unique():
                         key = (str(c).strip(), str(p).strip(), tipo_cliente_key, mes_actual)
                         val_default = campanas_activas.get(key, 0)
-                        # --- CLAVE DINÁMICA (REQ 3) ---
                         widget_key = f"dsct_{c}_{p}_{tipo_cliente_key}"
                         descuentos[(c,p)] = st.number_input(f"{c} - {p} %", 0, 50, val_default, key=widget_key)
         else:
@@ -477,7 +514,10 @@ else:
                 st.error("⚠️ Por favor ingrese su Correo y Celular para continuar.")
             else:
                 if es_cliente:
-                    enviar_notificacion(nom, correo, celular, cob, len(familia)-1)
+                    # Agregamos los datos detallados al correo
+                    enviar_notificacion(nom, correo, celular, cob, len(familia)-1, edad, clinicas, cont)
+                    # Guardamos el historial
+                    guardar_historial(nom, correo, celular, edad, salud, cob, cont, clinicas, len(familia)-1, "Cliente")
                 
                 st.session_state['resultados'] = buscar(df_full, df_redes, familia, clinicas, cont, cob, descuentos)
                 st.session_state['perfil'] = {'Titular': f"{nom} ({edad} años)", 'Dependientes': txt_dependientes, 'Continuidad': cont, 'Cobertura': cob}
@@ -539,5 +579,4 @@ else:
                     cls_clean = "_".join(cls_list)
                     fecha_str = datetime.now().strftime("%d%m%y_%H%M")
                     file_name = f"COTISALUD_{nom_clean}_{cls_clean}_{fecha_str}.pdf"
-
                     st.download_button("Descargar PDF", pdf_res, file_name, "application/pdf")

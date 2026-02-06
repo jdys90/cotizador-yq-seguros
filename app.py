@@ -398,7 +398,7 @@ def generar_pdf(perfil, df, id_sel, razon, folio):
         
         elements.append(Spacer(1, 10))
         if perfil['Continuidad'] == "Nuevo":
-            aviso = "<b>IMPORTANTE:</b> Al ser un seguro nuevo, aplican periodos de carencia (30 días) y espera (para preexistencias). Por favor revise el enlace de carencias en la tabla superior."
+            aviso = "<b>IMPORTANTE:</b> Al ser un seguro nuevo, aplican periodos de carencia (30 días) y espera. Por favor revise el enlace de carencias en la tabla superior."
             t_warn = Table([[Paragraph(aviso, ParagraphStyle('W', parent=st_norm, textColor=AZUL))]], colWidths=[18*cm])
             t_warn.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), AZUL_CLARO), ('BOX', (0,0), (-1,-1), 0.5, AZUL), ('PADDING', (0,0), (-1,-1), 8)]))
             elements.append(t_warn)
@@ -579,4 +579,5 @@ else:
                     cls_clean = "_".join(cls_list)
                     fecha_str = datetime.now().strftime("%d%m%y_%H%M")
                     file_name = f"COTISALUD_{nom_clean}_{cls_clean}_{fecha_str}.pdf"
+
                     st.download_button("Descargar PDF", pdf_res, file_name, "application/pdf")
